@@ -1,0 +1,2 @@
+class GCurve:
+    pass
