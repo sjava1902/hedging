@@ -122,3 +122,6 @@ class Portfolio:
     
     def get_portfolio(self):
         return self.portfolio
+    
+    def set_portfolio(self, portfolio):
+        self.portfolio = portfolio
