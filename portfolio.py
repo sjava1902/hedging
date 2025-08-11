@@ -10,9 +10,6 @@ DEP_TERM_PROB  = None        # равномерно
 DAYS_PER_MONTH = 365.25 / 12
 
 class Portfolio:
-    N_C = 0
-    N_D = 0
-    V = 0
     T0 = datetime(2016, 12, 31)
     credits = pd.DataFrame()
     deposits = pd.DataFrame()
@@ -43,26 +40,27 @@ class Portfolio:
         rem_deps [rem_deps  < eps] = eps
 
 
-        mat_loans = [
+        maturity_loans = [
             self.T0 + timedelta(days=float(m) * DAYS_PER_MONTH)
             for m in rem_loans
         ]
-        mat_deps = [
+        maturity_deps = [
             self.T0 + timedelta(days=float(m) * DAYS_PER_MONTH)
             for m in rem_deps
         ]
 
         start_loans = [
             mat - relativedelta(months=int(term))
-            for mat, term in zip(mat_loans, loan_terms)
+            for mat, term in zip(maturity_loans, loan_terms)
         ]
         start_deps = [
             mat - relativedelta(months=int(term))
-            for mat, term in zip(mat_deps, dep_terms)
+            for mat, term in zip(maturity_deps, dep_terms)
         ]
-        # 4. ставка: строим кривые на t_min ---------------------------------------
-        #t_min = min(start_loans + start_deps)
+        next_loans = [data + relativedelta(months=+1) for data in start_loans]
+        next_deps  = [data + relativedelta(months=+1) for data in start_deps]
 
+        # 4. ставка: строим кривыеы
         rates_loans = [self.loan_curve(term) for term in loan_terms]
         rates_deps  = [self.dep_curve(term)  for term in dep_terms]
 
@@ -75,8 +73,9 @@ class Portfolio:
                 "contract_months":  loan_terms,
                 "remaining_months": rem_loans,
                 "start_date":       start_loans,
-                "maturity_date":    mat_loans,
-                "rate":             rates_loans,   # годовая ставка
+                "next_payout_date": next_loans,
+                "maturity_date":    maturity_loans,
+                "rate":             rates_loans,
             }
         )
 
@@ -88,29 +87,26 @@ class Portfolio:
                 "contract_months":  dep_terms,
                 "remaining_months": rem_deps,
                 "start_date":       start_deps,
-                "maturity_date":    mat_deps,
+                "next_payout_date": next_deps,
+                "maturity_date":    maturity_deps,
                 "rate":             rates_deps,
             }
         )
 
         self.portfolio = pd.concat([self.credits, self.deposits], ignore_index=True)
-        self.portfolio["start_date"]    = (
-            pd.to_datetime(self.portfolio["start_date"]).dt.normalize()
-        )
-        self.portfolio["maturity_date"] = (
-            pd.to_datetime(self.portfolio["maturity_date"]).dt.normalize()
-)
+        self.portfolio["start_date"] = pd.to_datetime(self.portfolio["start_date"]).dt.normalize()
+        self.portfolio["maturity_date"] = pd.to_datetime(self.portfolio["maturity_date"]).dt.normalize()
+        self.portfolio["next_payout_date"] = pd.to_datetime(self.portfolio["next_payout_date"]).dt.normalize()
 
     def loan_curve(self, term_months: int, noise=0.0005):
         """
-        Игрушечная «кривая» ставок для кредитов non-fin, %
-        Базовая линия 10% годовых, чуть падает c дюрацией + шум.
+            Базовая линия 10% годовых, чуть падает c дюрацией + шум.
         """
         return 0.10 - 0.003 * term_months / 12 + self.rng.normal(0, noise)
 
     def dep_curve(self, term_months: int, noise=0.0005):
         """
-        Кривая ставок для депозитов - чуть ниже кредитной.
+            Кривая ставок для депозитов - чуть ниже кредитной.
         """
         return 0.08 - 0.0025 * term_months / 12 + self.rng.normal(0, noise)
 
@@ -122,3 +118,6 @@ class Portfolio:
     
     def get_portfolio(self):
         return self.portfolio
+    
+    def set_portfolio(self, portfolio):
+        self.portfolio = portfolio
